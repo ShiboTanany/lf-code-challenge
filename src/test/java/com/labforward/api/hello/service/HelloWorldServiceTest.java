@@ -1,4 +1,4 @@
-package com.labforward.api.hello;
+package com.labforward.api.hello.service;
 
 import com.labforward.api.core.enums.Greetings;
 import com.labforward.api.core.enums.Messages;
