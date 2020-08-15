@@ -1,5 +1,7 @@
 package com.labforward.api.hello;
 
+import com.labforward.api.core.enums.Greetings;
+import com.labforward.api.core.enums.Messages;
 import com.labforward.api.core.exception.EntityValidationException;
 import com.labforward.api.hello.domain.Greeting;
 import com.labforward.api.hello.service.HelloWorldService;
@@ -26,8 +28,8 @@ public class HelloWorldServiceTest {
 	public void getDefaultGreetingIsOK() {
 		Optional<Greeting> greeting = helloService.getDefaultGreeting();
 		Assert.assertTrue(greeting.isPresent());
-		Assert.assertEquals(HelloWorldService.DEFAULT_ID, greeting.get().getId());
-		Assert.assertEquals(HelloWorldService.DEFAULT_MESSAGE, greeting.get().getMessage());
+		Assert.assertEquals(Greetings.DEFAULT_ID.getGreeting(), greeting.get().getId());
+		Assert.assertEquals(Messages.DEFAULT_MESSAGE.getMessage(), greeting.get().getMessage());
 	}
 
 	@Test(expected = EntityValidationException.class)
@@ -49,4 +51,35 @@ public class HelloWorldServiceTest {
 		Greeting created = helloService.createGreeting(request);
 		Assert.assertEquals(HELLO_LUKE, created.getMessage());
 	}
+
+	@Test
+	public void updateGreetingWhenItIsExists() {
+		final String HELLO_LUKE = "Hello Luke";
+		Greeting request = new Greeting(HELLO_LUKE);
+
+		Greeting created = helloService.createGreeting(request);
+		Assert.assertEquals(HELLO_LUKE, created.getMessage());
+		created.setMessage(HELLO_LUKE+HELLO_LUKE);
+		Optional<Greeting> edited = helloService.updateGreeting(created);
+		Assert.assertTrue(edited.isPresent());
+		Assert.assertEquals(HELLO_LUKE+HELLO_LUKE, created.getMessage());
+
+	}
+
+	@Test
+	public void updateGreetingWhenItIsNotExists() {
+		final String HELLO_LUKE = "Hello Luke";
+		Greeting request = new Greeting(HELLO_LUKE);
+		Greeting created = helloService.createGreeting(request);
+		created.setId("error-id");
+		Optional<Greeting> notEditedObject = helloService.updateGreeting(created);
+		Assert.assertFalse(notEditedObject.isPresent());
+	}
+
+	@Test(expected = EntityValidationException.class)
+	public void updateGreetingWhenMessageIsNull() {
+		Greeting request = new Greeting();
+		helloService.updateGreeting(request);
+	}
+
 }
