@@ -6,11 +6,17 @@ import com.labforward.api.hello.service.HelloWorldService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.util.Optional;
 
+/**
+ * @author Shaaban Ebrahim
+ */
 @Controller
 public class IndexController {
 
@@ -20,7 +26,7 @@ public class IndexController {
         this.helloWorldService = helloWorldService;
     }
 
-    @RequestMapping(value = {"/", "index"})
+    @GetMapping(value = {"/", "index"})
     public ModelAndView index() {
         ModelAndView indexModelAndView = new ModelAndView("index");
         indexModelAndView.addObject("greetings", this.helloWorldService.getGreetings());

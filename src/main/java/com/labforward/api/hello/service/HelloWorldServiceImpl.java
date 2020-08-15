@@ -1,6 +1,5 @@
 package com.labforward.api.hello.service;
 
-import com.google.common.collect.UnmodifiableIterator;
 import com.labforward.api.core.enums.Greetings;
 import com.labforward.api.core.enums.Messages;
 import com.labforward.api.core.validation.EntityValidator;
@@ -69,10 +68,12 @@ public class HelloWorldServiceImpl implements HelloWorldService {
 
     @Override
     public boolean deleteGreeting(Greeting greeting) {
-        if(isGreetingExists(greeting)){
+        entityValidator.validateDelete(greeting);
+        if (isGreetingExists(greeting)) {
             this.greetings.remove(greeting.getId());
+            return !isGreetingExists(greeting);
         }
-        return !isGreetingExists(greeting);
+        return false;
     }
 
     private boolean isGreetingExists(Greeting request) {

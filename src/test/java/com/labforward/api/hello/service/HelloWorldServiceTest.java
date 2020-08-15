@@ -82,4 +82,28 @@ public class HelloWorldServiceTest {
 		helloService.updateGreeting(request);
 	}
 
+	@Test
+	public void deleteGreetingWhenItIsNotExists() {
+		final String HELLO_LUKE = "Hello Luke";
+		Greeting request = new Greeting(HELLO_LUKE);
+		Greeting created = helloService.createGreeting(request);
+		created.setId("error-id");
+		boolean isDeleted = helloService.deleteGreeting(created);
+		Assert.assertFalse(isDeleted);
+	}
+
+	@Test
+	public void deleteeGreetingWhenItIsExists() {
+		final String HELLO_LUKE = "Hello Luke";
+		Greeting request = new Greeting(HELLO_LUKE);
+		Greeting created = helloService.createGreeting(request);
+		boolean isDeleted = helloService.deleteGreeting(created);
+		Assert.assertTrue(isDeleted);
+	}
+
+	@Test(expected = EntityValidationException.class)
+	public void deleteGreetingWhenMessageIsNull() {
+		Greeting request = new Greeting();
+		helloService.deleteGreeting(request);
+	}
 }

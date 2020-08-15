@@ -4,16 +4,16 @@ import org.springframework.validation.BindingResult;
 
 public class EntityValidationException extends RuntimeException {
 
-	public static String MESSAGE = "Bad Request";
+    private static final String MESSAGE = "Bad Request";
 
-	private BindingResult bindingResult;
+    private final transient BindingResult bindingResult;
 
-	public EntityValidationException(BindingResult bindingResult) {
-		super(MESSAGE);
-		this.bindingResult = bindingResult;
-	}
+    public EntityValidationException(BindingResult bindingResult) {
+        super(MESSAGE);
+        this.bindingResult = bindingResult;
+    }
 
-	public BindingResult getBindingResult() {
-		return this.bindingResult;
-	}
+    public BindingResult getBindingResult() {
+        return this.bindingResult;
+    }
 }

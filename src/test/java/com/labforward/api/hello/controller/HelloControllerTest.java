@@ -1,12 +1,11 @@
 package com.labforward.api.hello.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.labforward.api.common.GreetingUtils;
 import com.labforward.api.common.MVCIntegrationTest;
 import com.labforward.api.core.enums.Greetings;
 import com.labforward.api.core.enums.Messages;
 import com.labforward.api.hello.domain.Greeting;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -28,7 +27,7 @@ public class HelloControllerTest extends MVCIntegrationTest {
     private static final String HELLO_LUKE = "Hello Luke";
 
     @Test
-    public void getHelloIsOKAndReturnsValidJSON() throws Exception {
+    public void testGetHelloIsOKAndReturnsValidJSON() throws Exception {
         mockMvc.perform(get("/hello"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(Greetings.DEFAULT_ID.getGreeting())))
@@ -36,7 +35,7 @@ public class HelloControllerTest extends MVCIntegrationTest {
     }
 
     @Test
-    public void returnsBadRequestWhenMessageMissing() throws Exception {
+    public void testCreateGreetingReturnsBadRequestWhenMessageMissing() throws Exception {
         String body = "{}";
         mockMvc.perform(post("/hello").content(body)
                 .contentType(MediaType.APPLICATION_JSON))
@@ -46,7 +45,7 @@ public class HelloControllerTest extends MVCIntegrationTest {
     }
 
     @Test
-    public void returnsBadRequestWhenUnexpectedAttributeProvided() throws Exception {
+    public void testCreateGreetingReturnsBadRequestWhenUnexpectedAttributeProvided() throws Exception {
         String body = "{ \"tacos\":\"value\" }}";
         mockMvc.perform(post("/hello").content(body).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnprocessableEntity())
@@ -54,9 +53,9 @@ public class HelloControllerTest extends MVCIntegrationTest {
     }
 
     @Test
-    public void returnsBadRequestWhenMessageEmptyString() throws Exception {
+    public void testCreateGreetingReturnsBadRequestWhenMessageEmptyString() throws Exception {
         Greeting emptyMessage = new Greeting("");
-        final String body = getGreetingBody(emptyMessage);
+        final String body = GreetingUtils.getGreetingBody(emptyMessage);
 
         mockMvc.perform(post("/hello").content(body)
                 .contentType(MediaType.APPLICATION_JSON))
@@ -66,24 +65,24 @@ public class HelloControllerTest extends MVCIntegrationTest {
     }
 
     @Test
-    public void createOKWhenRequiredGreetingProvided() throws Exception {
+    public void testCreateOKWhenRequiredGreetingProvided() throws Exception {
         Greeting hello = new Greeting(HELLO_LUKE);
-        final String body = getGreetingBody(hello);
+        final String body = GreetingUtils.getGreetingBody(hello);
 
         mockMvc.perform(post("/hello").contentType(MediaType.APPLICATION_JSON)
                 .content(body))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message", is(hello.getMessage())));
     }
 
     @Test
-    public void updateExistedGreeting() throws Exception {
+    public void testUpdateExistedGreeting() throws Exception {
         Greeting hello = new Greeting(HELLO_LUKE);
-        final String body = getGreetingBody(hello);
+        final String body = GreetingUtils.getGreetingBody(hello);
 
         MvcResult mvcResult = mockMvc.perform(post("/hello").contentType(MediaType.APPLICATION_JSON)
                 .content(body))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message", is(hello.getMessage())))
                 .andReturn();
         ;
@@ -92,7 +91,7 @@ public class HelloControllerTest extends MVCIntegrationTest {
         String json = mvcResult.getResponse().getContentAsString();
         Greeting createdObject = new ObjectMapper().readValue(json, Greeting.class);
         createdObject.setMessage(newGreeting);
-        final String newBody = getGreetingBody(createdObject);
+        final String newBody = GreetingUtils.getGreetingBody(createdObject);
         mockMvc.perform(put("/hello").contentType(MediaType.APPLICATION_JSON)
                 .content(newBody))
                 .andExpect(status().isOk())
@@ -100,7 +99,7 @@ public class HelloControllerTest extends MVCIntegrationTest {
     }
 
     @Test
-    public void updateShouldReturnsUnprocessedEntityWithErrorsWhenMessageIsMissing() throws Exception {
+    public void testUpdateShouldReturnsUnprocessedEntityWithErrorsWhenMessageIsMissing() throws Exception {
         String body = "{}";
         mockMvc.perform(put("/hello").content(body)
                 .contentType(MediaType.APPLICATION_JSON))
@@ -110,24 +109,50 @@ public class HelloControllerTest extends MVCIntegrationTest {
     }
 
     @Test
-    public void updateNotExistedGreeting() throws Exception {
+    public void testUpdateNotExistedGreeting() throws Exception {
         Greeting hello = new Greeting(HELLO_LUKE);
-        final String body = getGreetingBody(hello);
+        final String body = GreetingUtils.getGreetingBody(hello);
         mockMvc.perform(put("/hello").contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isUnprocessableEntity());
 
     }
 
+    @Test
+    public void testDeleteExistedGreeting() throws Exception {
+        Greeting hello = new Greeting(HELLO_LUKE);
+        final String body = GreetingUtils.getGreetingBody(hello);
 
-    private String getGreetingBody(Greeting greeting) throws JSONException {
-        JSONObject json = new JSONObject().put("message", greeting.getMessage());
+        MvcResult mvcResult = mockMvc.perform(post("/hello").contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message", is(hello.getMessage())))
+                .andReturn();
+        String json = mvcResult.getResponse().getContentAsString();
+        Greeting createdObject = new ObjectMapper().readValue(json, Greeting.class);
+        final String anotherBody = GreetingUtils.getGreetingBody(createdObject);
+        mockMvc.perform(delete("/hello").contentType(MediaType.APPLICATION_JSON)
+                .content(anotherBody))
+                .andExpect(status().isOk());
+    }
 
-        if (greeting.getId() != null) {
-            json.put("id", greeting.getId());
-        }
+    @Test
+    public void testDeleteNonExistedGreeting() throws Exception {
+        Greeting hello = new Greeting(HELLO_LUKE);
+        final String body = GreetingUtils.getGreetingBody(hello);
+        mockMvc.perform(delete("/hello").contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isNotFound());
+    }
 
-        return json.toString();
+    @Test
+    public void testDeleteShouldReturnsUnprocessedEntityWithErrorsWhenMessageIsMissing() throws Exception {
+        String body = "{}";
+        mockMvc.perform(delete("/hello").content(body)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.validationErrors", hasSize(1)))
+                .andExpect(jsonPath("$.validationErrors[*].field", contains("message")));
     }
 
 }

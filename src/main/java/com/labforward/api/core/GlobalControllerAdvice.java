@@ -6,6 +6,7 @@ import com.labforward.api.core.creation.EntityCreatedResponse;
 import com.labforward.api.core.deletion.NoContentResponse;
 import com.labforward.api.core.domain.ApiMessage;
 import com.labforward.api.core.domain.ValidationErrorMessage;
+import com.labforward.api.core.enums.Delimiters;
 import com.labforward.api.core.enums.Messages;
 import com.labforward.api.core.exception.*;
 import org.springframework.beans.TypeMismatchException;
@@ -31,7 +32,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.UUID;
 
-import static com.labforward.api.core.validation.BeanValidationUtils.OBJECT_ERROR_DELIMITER;
 
 /**
  * Global exception handler
@@ -43,9 +43,6 @@ import static com.labforward.api.core.validation.BeanValidationUtils.OBJECT_ERRO
 public class GlobalControllerAdvice extends ResponseEntityExceptionHandler implements ResponseBodyAdvice<Object> {
 
     private static final ApiMessage GENERIC_NOT_FOUND_MESSAGE = new ApiMessage("Entity not found.");
-
-    public GlobalControllerAdvice() {
-    }
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ExceptionHandler(UserAgentRequiredException.class)
@@ -96,7 +93,7 @@ public class GlobalControllerAdvice extends ResponseEntityExceptionHandler imple
         ValidationErrorMessage message = new ValidationErrorMessage(ex.getMessage());
 
         for (FieldError fieldError : fieldErrors) {
-            String[] info = fieldError.getDefaultMessage().split(OBJECT_ERROR_DELIMITER);
+            String[] info = fieldError.getDefaultMessage().split(Delimiters.HASH.getDelimiter());
             if (info.length == 2) {
                 message.addError(info[0], info[1]);
             } else {
@@ -105,7 +102,7 @@ public class GlobalControllerAdvice extends ResponseEntityExceptionHandler imple
         }
 
         for (ObjectError objectError : objectErrors) {
-            String[] info = objectError.getDefaultMessage().split(OBJECT_ERROR_DELIMITER);
+            String[] info = objectError.getDefaultMessage().split(Delimiters.HASH.getDelimiter());
             if (info.length == 2) {
                 message.addError(info[0], info[1]);
             } else {
@@ -156,9 +153,7 @@ public class GlobalControllerAdvice extends ResponseEntityExceptionHandler imple
         }
 
         handleCacheHeaders(serverHttpResponse);
-        final Object created = handleObjectCreated(o, (ServletServerHttpResponse) serverHttpResponse);
-
-        return created;
+        return  handleObjectCreated(o, (ServletServerHttpResponse) serverHttpResponse);
     }
 
     @Override
