@@ -6,7 +6,9 @@ buildscript {
         classpath("org.springframework.boot:spring-boot-gradle-plugin:2.2.1.RELEASE")
     }
 }
-
+plugins {
+    id "org.sonarqube" version "2.7"
+}
 apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
@@ -20,6 +22,10 @@ bootJar {
 
 repositories {
     mavenCentral()
+    //
+    mavenLocal()
+    jcenter()
+    //
 }
 
 sourceCompatibility = 1.8
@@ -31,4 +37,8 @@ dependencies {
     compile("com.google.guava:guava:28.1-jre")
     testCompile('org.springframework.boot:spring-boot-starter-test')
     testCompile('com.jayway.jsonpath:json-path')
+    /*
+    */
+    compile ('org.springframework.boot:spring-boot-starter-thymeleaf')
+    /**/
 }

@@ -6,20 +6,11 @@ import com.labforward.api.core.creation.EntityCreatedResponse;
 import com.labforward.api.core.deletion.NoContentResponse;
 import com.labforward.api.core.domain.ApiMessage;
 import com.labforward.api.core.domain.ValidationErrorMessage;
-import com.labforward.api.core.exception.BadRequestException;
-import com.labforward.api.core.exception.EntityValidationException;
-import com.labforward.api.core.exception.ResourceNotAccessibleException;
-import com.labforward.api.core.exception.ResourceNotFoundException;
-import com.labforward.api.core.exception.ServiceUnavailableException;
-import com.labforward.api.core.exception.UnsupportedMediaTypeException;
-import com.labforward.api.core.exception.UserAgentRequiredException;
+import com.labforward.api.core.enums.Messages;
+import com.labforward.api.core.exception.*;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.MethodParameter;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.server.ServerHttpRequest;
@@ -51,240 +42,236 @@ import static com.labforward.api.core.validation.BeanValidationUtils.OBJECT_ERRO
 @ControllerAdvice
 public class GlobalControllerAdvice extends ResponseEntityExceptionHandler implements ResponseBodyAdvice<Object> {
 
-	public static final String MESSAGE_UNRECOGNIZED_PROPERTY = "Unrecognized property: ";
+    private static final ApiMessage GENERIC_NOT_FOUND_MESSAGE = new ApiMessage("Entity not found.");
 
-	private static final String MESSAGE_BAD_REQUEST = "Client error: server will not process request";
+    public GlobalControllerAdvice() {
+    }
 
-	private static final ApiMessage GENERIC_NOT_FOUND_MESSAGE = new ApiMessage("Entity not found.");
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(UserAgentRequiredException.class)
+    @ResponseBody
+    public ApiMessage handleNoUserAgent(UserAgentRequiredException ex) {
+        return getApiErrorMessage(ex);
+    }
 
-	public GlobalControllerAdvice() {
-	}
+    @ResponseStatus(HttpStatus.NOT_ACCEPTABLE)
+    @ExceptionHandler(UnsupportedMediaTypeException.class)
+    public ResponseEntity<ApiMessage> handleUnsupportedMediaType(UnsupportedMediaTypeException ex) {
+        return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
+    }
 
-	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	@ExceptionHandler(UserAgentRequiredException.class)
-	@ResponseBody
-	public ApiMessage handleNoUserAgent(UserAgentRequiredException ex) {
-		return getApiErrorMessage(ex);
-	}
+    /*
+     * Returns not found codes on not found exception.
+     */
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseBody
+    public ApiMessage handleNotFound(ResourceNotFoundException e) {
+        return getApiErrorMessage(e);
+    }
 
-	@ResponseStatus(HttpStatus.NOT_ACCEPTABLE)
-	@ExceptionHandler(UnsupportedMediaTypeException.class)
-	public ResponseEntity<ApiMessage> handleUnsupportedMediaType(UnsupportedMediaTypeException ex) {
-		return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
-	}
+    /*
+     * Returns bad request when @RequestParameter required values are missing
+     */
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseBody
+    @ExceptionHandler(BadRequestException.class)
+    public Object missingParameterHandler(BadRequestException e) {
+        return getApiErrorMessage(e);
+    }
 
-	/*
-	 * Returns not found codes on not found exception.
-	 */
-	@ResponseStatus(HttpStatus.NOT_FOUND)
-	@ExceptionHandler(ResourceNotFoundException.class)
-	@ResponseBody
-	public ApiMessage handleNotFound(ResourceNotFoundException e) {
-		return getApiErrorMessage(e);
-	}
+    /*
+     * Handler for validation errors
+     * */
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    @ResponseBody
+    @ExceptionHandler(EntityValidationException.class)
+    public Object entityValidationException(EntityValidationException ex) {
 
-	/*
-	 * Returns bad request when @RequestParameter required values are missing
-	 */
-	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	@ResponseBody
-	@ExceptionHandler(BadRequestException.class)
-	public Object missingParameterHandler(BadRequestException e) {
-		return getApiErrorMessage(e);
-	}
+        List<FieldError> fieldErrors = ex.getBindingResult()
+                .getFieldErrors();
+        List<ObjectError> objectErrors = ex.getBindingResult()
+                .getGlobalErrors();
 
-	/*
-	 * Handler for validation errors
-	 * */
-	@ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-	@ResponseBody
-	@ExceptionHandler(EntityValidationException.class)
-	public Object entityValidationException(EntityValidationException ex) {
+        ValidationErrorMessage message = new ValidationErrorMessage(ex.getMessage());
 
-		List<FieldError> fieldErrors = ex.getBindingResult()
-		                                 .getFieldErrors();
-		List<ObjectError> objectErrors = ex.getBindingResult()
-		                                   .getGlobalErrors();
+        for (FieldError fieldError : fieldErrors) {
+            String[] info = fieldError.getDefaultMessage().split(OBJECT_ERROR_DELIMITER);
+            if (info.length == 2) {
+                message.addError(info[0], info[1]);
+            } else {
+                message.addError(fieldError.getField(), fieldError.getDefaultMessage());
+            }
+        }
 
-		ValidationErrorMessage message = new ValidationErrorMessage(ex.getMessage());
+        for (ObjectError objectError : objectErrors) {
+            String[] info = objectError.getDefaultMessage().split(OBJECT_ERROR_DELIMITER);
+            if (info.length == 2) {
+                message.addError(info[0], info[1]);
+            } else {
+                message.addError(objectError.getObjectName(), objectError.getDefaultMessage());
+            }
+        }
 
-		for (FieldError fieldError : fieldErrors) {
-			String[] info = fieldError.getDefaultMessage().split(OBJECT_ERROR_DELIMITER);
-			if (info.length == 2) {
-				message.addError(info[0], info[1]);
-			} else {
-				message.addError(fieldError.getField(), fieldError.getDefaultMessage());
-			}
-		}
+        return message;
+    }
 
-		for (ObjectError objectError : objectErrors) {
-			String[] info = objectError.getDefaultMessage().split(OBJECT_ERROR_DELIMITER);
-			if (info.length == 2) {
-				message.addError(info[0], info[1]);
-			} else {
-				message.addError(objectError.getObjectName(), objectError.getDefaultMessage());
-			}
-		}
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    @ResponseBody
+    @ExceptionHandler(ResourceNotAccessibleException.class)
+    public Object featureNotEnabledException(ResourceNotAccessibleException ex) {
+        return new ApiMessage(ex.getMessage());
+    }
 
-		return message;
-	}
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    @ResponseBody
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public Object serviceUnavailableException(ServiceUnavailableException ex) {
+        return new ApiMessage(ex.getMessage());
+    }
 
-	@ResponseStatus(HttpStatus.FORBIDDEN)
-	@ResponseBody
-	@ExceptionHandler(ResourceNotAccessibleException.class)
-	public Object featureNotEnabledException(ResourceNotAccessibleException ex) {
-		return new ApiMessage(ex.getMessage());
-	}
+    /*
+     * Generic handler for unspecified errors.
+     */
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseBody
+    @ExceptionHandler(Exception.class)
+    public Object genericExceptionHandler(Exception e) {
+        return getApiErrorMessage(e);
+    }
 
-	@ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-	@ResponseBody
-	@ExceptionHandler(ServiceUnavailableException.class)
-	public Object serviceUnavailableException(ServiceUnavailableException ex) {
-		return new ApiMessage(ex.getMessage());
-	}
+    @Override
+    public boolean supports(MethodParameter methodParameter, Class<? extends HttpMessageConverter<?>> aClass) {
+        return true;
+    }
 
-	/*
-	 * Generic handler for unspecified errors.
-	 */
-	@ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-	@ResponseBody
-	@ExceptionHandler(Exception.class)
-	public Object genericExceptionHandler(Exception e) {
-		return getApiErrorMessage(e);
-	}
+    @Override
+    public Object beforeBodyWrite(Object o, MethodParameter methodParameter, MediaType mediaType,
+                                  Class<? extends HttpMessageConverter<?>> aClass, ServerHttpRequest serverHttpRequest,
+                                  ServerHttpResponse serverHttpResponse) {
 
-	@Override
-	public boolean supports(MethodParameter methodParameter, Class<? extends HttpMessageConverter<?>> aClass) {
-		return true;
-	}
+        if (o instanceof NoContentResponse) {
+            serverHttpResponse.getHeaders().remove(HttpHeaders.CONTENT_TYPE);
+            return o;
+        }
 
-	@Override
-	public Object beforeBodyWrite(Object o, MethodParameter methodParameter, MediaType mediaType,
-	                              Class<? extends HttpMessageConverter<?>> aClass, ServerHttpRequest serverHttpRequest,
-	                              ServerHttpResponse serverHttpResponse) {
+        handleCacheHeaders(serverHttpResponse);
+        final Object created = handleObjectCreated(o, (ServletServerHttpResponse) serverHttpResponse);
 
-		if (o instanceof NoContentResponse) {
-			serverHttpResponse.getHeaders().remove(HttpHeaders.CONTENT_TYPE);
-			return o;
-		}
+        return created;
+    }
 
-		handleCacheHeaders(serverHttpResponse);
-		final Object created = handleObjectCreated(o, (ServletServerHttpResponse) serverHttpResponse);
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+                                                        HttpStatus status, WebRequest request) {
+        // return 404 when invalid UUID is provided in request
+        if (ex.getRequiredType().equals(UUID.class)) {
+            return new ResponseEntity<>(GENERIC_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
+        }
+        return super.handleTypeMismatch(ex, headers, status, request);
+    }
 
-		return created;
-	}
+    /*
+     * Override default Spring handling to return details of failed
+     * validation attempt on request body.
+     *
+     * How: the exception is generated when the incoming request body does not
+     * conform to the expected object
+     *
+     * Note: Spring defaults to 400, Bad Request, which is what we want, but we'd like
+     * to send a message as well
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+                                                                  HttpHeaders headers, HttpStatus status,
+                                                                  WebRequest request) {
+        StringBuilder sb = new StringBuilder();
+        if (ex.getCause() instanceof UnrecognizedPropertyException) {
+            UnrecognizedPropertyException e = (UnrecognizedPropertyException) ex.getCause();
+            sb.append(Messages.MESSAGE_UNRECOGNIZED_PROPERTY.getMessage());
+            sb.append(e.getPropertyName());
+        } else {
+            sb.append(Throwables.getRootCause(ex).getMessage());
+        }
 
-	@Override
-	protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
-	                                                    HttpStatus status, WebRequest request) {
-		// return 404 when invalid UUID is provided in request
-		if (ex.getRequiredType().equals(UUID.class)) {
-			return new ResponseEntity<>(GENERIC_NOT_FOUND_MESSAGE, HttpStatus.NOT_FOUND);
-		}
-		return super.handleTypeMismatch(ex, headers, status, request);
-	}
+        ApiMessage message = new ApiMessage(sb.toString());
 
-	/*
-	 * Override default Spring handling to return details of failed
-	 * validation attempt on request body.
-	 *
-	 * How: the exception is generated when the incoming request body does not
-	 * conform to the expected object
-	 *
-	 * Note: Spring defaults to 400, Bad Request, which is what we want, but we'd like
-	 * to send a message as well
-	 */
-	@Override
-	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
-	                                                              HttpHeaders headers, HttpStatus status,
-	                                                              WebRequest request) {
-		StringBuilder sb = new StringBuilder();
-		if (ex.getCause() instanceof UnrecognizedPropertyException) {
-			UnrecognizedPropertyException e = (UnrecognizedPropertyException) ex.getCause();
-			sb.append(MESSAGE_UNRECOGNIZED_PROPERTY);
-			sb.append(e.getPropertyName());
-		} else {
-			sb.append(Throwables.getRootCause(ex).getMessage());
-		}
+        return new ResponseEntity<>(message, HttpStatus.BAD_REQUEST);
+    }
 
-		ApiMessage message = new ApiMessage(sb.toString());
+    /*
+     * Override default Spring handling to return details of failed
+     * validation attempt on request body.
+     *
+     * How: the exception is generated when validation fails on
+     * an @Valid @RequestBody input to controller.
+     *
+     * Note: Spring defaults to 400, Bad Request, which is what we want
+     *
+     * "The 400 (Bad Request) status code indicates that the server cannot or
+     * will not process the request due to something which is perceived to
+     * be a client error (e.g., malformed request syntax, invalid request
+     * message framing, or deceptive request routing)."
+     *
+     * https://tools.ietf.org/html/draft-ietf-httpbis-p2-semantics-26#section-6.5.1
+     */
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+                                                                  HttpHeaders headers, HttpStatus status,
+                                                                  WebRequest request) {
+        List<FieldError> fieldErrors = ex.getBindingResult()
+                .getFieldErrors();
+        List<ObjectError> globalErrors = ex.getBindingResult()
+                .getGlobalErrors();
 
-		return new ResponseEntity<>(message, HttpStatus.BAD_REQUEST);
-	}
+        ValidationErrorMessage message = new ValidationErrorMessage(Messages.MESSAGE_BAD_REQUEST.getMessage());
 
-	/*
-	 * Override default Spring handling to return details of failed
-	 * validation attempt on request body.
-	 *
-	 * How: the exception is generated when validation fails on
-	 * an @Valid @RequestBody input to controller.
-	 *
-	 * Note: Spring defaults to 400, Bad Request, which is what we want
-	 *
-	 * "The 400 (Bad Request) status code indicates that the server cannot or
-	 * will not process the request due to something which is perceived to
-	 * be a client error (e.g., malformed request syntax, invalid request
-	 * message framing, or deceptive request routing)."
-	 *
-	 * https://tools.ietf.org/html/draft-ietf-httpbis-p2-semantics-26#section-6.5.1
-	 */
-	@Override
-	protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
-	                                                              HttpHeaders headers, HttpStatus status,
-	                                                              WebRequest request) {
-		List<FieldError> fieldErrors = ex.getBindingResult()
-		                                 .getFieldErrors();
-		List<ObjectError> globalErrors = ex.getBindingResult()
-		                                   .getGlobalErrors();
+        for (FieldError fieldError : fieldErrors) {
+            message.addError(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+        for (ObjectError objectError : globalErrors) {
+            message.addError(objectError.getObjectName(), objectError.getDefaultMessage());
+        }
 
-		ValidationErrorMessage message = new ValidationErrorMessage(MESSAGE_BAD_REQUEST);
+        return new ResponseEntity(message, headers, status);
+    }
 
-		for (FieldError fieldError : fieldErrors) {
-			message.addError(fieldError.getField(), fieldError.getDefaultMessage());
-		}
-		for (ObjectError objectError : globalErrors) {
-			message.addError(objectError.getObjectName(), objectError.getDefaultMessage());
-		}
+    private void handleCacheHeaders(ServerHttpResponse serverHttpResponse) {
+        serverHttpResponse.getHeaders()
+                .setCacheControl(CacheControl.noCache()
+                        .getHeaderValue());
+    }
 
-		return new ResponseEntity(message, headers, status);
-	}
+    /*
+     * Global implementation for handling newly created entities
+     *
+     * Synchronous object creation:
+     * HTTP.CREATED (201) is returned along with 'Location' header of new object
+     *
+     * Asynchronous result creation:
+     * HTTP.ACCEPTED (202) is returned along with a 'Location' header to further track the status of the operation
+     */
+    private Object handleObjectCreated(Object o, ServletServerHttpResponse serverHttpResponse) {
 
-	private void handleCacheHeaders(ServerHttpResponse serverHttpResponse) {
-		serverHttpResponse.getHeaders()
-		                  .setCacheControl(CacheControl.noCache()
-		                                               .getHeaderValue());
-	}
+        if (o instanceof EntityCreatedResponse) {
+            EntityCreatedResponse creationResponse = (EntityCreatedResponse) o;
+            HttpServletResponse servletResponse = serverHttpResponse.getServletResponse();
 
-	/*
-	 * Global implementation for handling newly created entities
-	 *
-	 * Synchronous object creation:
-	 * HTTP.CREATED (201) is returned along with 'Location' header of new object
-	 *
-	 * Asynchronous result creation:
-	 * HTTP.ACCEPTED (202) is returned along with a 'Location' header to further track the status of the operation
-	 */
-	private Object handleObjectCreated(Object o, ServletServerHttpResponse serverHttpResponse) {
+            // Add location header for new object
+            serverHttpResponse.getHeaders()
+                    .set(HttpHeaders.LOCATION, creationResponse.getLocation()
+                            .toString());
 
-		if (o instanceof EntityCreatedResponse) {
-			EntityCreatedResponse creationResponse = (EntityCreatedResponse) o;
-			HttpServletResponse servletResponse = serverHttpResponse.getServletResponse();
-
-			// Add location header for new object
-			serverHttpResponse.getHeaders()
-			                  .set(HttpHeaders.LOCATION, creationResponse.getLocation()
-			                                                             .toString());
-
-			servletResponse.setStatus(HttpStatus.CREATED.value());
+            servletResponse.setStatus(HttpStatus.CREATED.value());
 
 
-			return creationResponse.getEntity();
-		}
+            return creationResponse.getEntity();
+        }
 
-		return o;
-	}
+        return o;
+    }
 
-	private ApiMessage getApiErrorMessage(Exception ex) {
-		return new ApiMessage(ex.getMessage());
-	}
+    private ApiMessage getApiErrorMessage(Exception ex) {
+        return new ApiMessage(ex.getMessage());
+    }
 }

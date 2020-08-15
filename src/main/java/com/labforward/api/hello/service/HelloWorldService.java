@@ -2,6 +2,8 @@ package com.labforward.api.hello.service;
 
 import com.labforward.api.hello.domain.Greeting;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 
@@ -14,4 +16,8 @@ public interface HelloWorldService {
     Optional<Greeting> getDefaultGreeting();
 
     Optional<Greeting> updateGreeting(Greeting request);
+
+    Map<String,Greeting> getGreetings();
+
+    boolean deleteGreeting(Greeting greeting);
 }

@@ -1,15 +1,13 @@
 package com.labforward.api.hello.service;
 
+import com.google.common.collect.UnmodifiableIterator;
 import com.labforward.api.core.enums.Greetings;
 import com.labforward.api.core.enums.Messages;
 import com.labforward.api.core.validation.EntityValidator;
 import com.labforward.api.hello.domain.Greeting;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * @author Shaaban Ebrahim
@@ -62,6 +60,19 @@ public class HelloWorldServiceImpl implements HelloWorldService {
             return getGreeting(request.getId());
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Map<String, Greeting> getGreetings() {
+        return Collections.unmodifiableMap(this.greetings);
+    }
+
+    @Override
+    public boolean deleteGreeting(Greeting greeting) {
+        if(isGreetingExists(greeting)){
+            this.greetings.remove(greeting.getId());
+        }
+        return !isGreetingExists(greeting);
     }
 
     private boolean isGreetingExists(Greeting request) {
